@@ -7,10 +7,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -22,37 +22,33 @@ jobs:
           chmod +x /usr/local/bin/apktool
 
       - name: Download Via Browser APK
-        run: |
-          wget -q https://res.viayoo.com/v1/via-release.apk -O via-release.apk
+        run: wget -q https://res.viayoo.com/v1/via-release.apk -O via-release.apk
 
       - name: Decompile APK
-        run: |
-          apktool d via-release.apk -o via-decompiled --no-res
+        run: apktool d via-release.apk -o via-decompiled --no-res
 
-      - name: Replace homepage URL
+      - name: Replace homepage URL with Gemini
         run: |
-          grep -r "viayoo\|about:blank\|homepage" via-decompiled/ --include="*.smali" --include="*.xml" -l || true
-          find via-decompiled/ -type f \( -name "*.smali" -o -name "*.xml" \) | xargs grep -l "about:blank\|viayoo.com\|start_url\|homepage" 2>/dev/null | head -20
-          find via-decompiled/ -type f \( -name "*.smali" -o -name "*.xml" \) -exec sed -i 's|about:blank|https://gemini.google.com/app|g' {} \;
-          find via-decompiled/ -type f \( -name "*.smali" -o -name "*.xml" \) -exec sed -i 's|http://viayoo.com|https://gemini.google.com/app|g' {} \;
-          find via-decompiled/ -type f -name "*.smali" -exec sed -i 's|"https://viayoo.com"|"https://gemini.google.com/app"|g' {} \;
+          find via-decompiled/ -type f \( -name "*.smali" -o -name "*.xml" \) \
+            -exec sed -i 's|about:blank|https://gemini.google.com/app|g' {} \;
+          find via-decompiled/ -type f \( -name "*.smali" -o -name "*.xml" \) \
+            -exec sed -i 's|http://viayoo.com|https://gemini.google.com/app|g' {} \;
 
       - name: Recompile APK
-        run: |
-          apktool b via-decompiled -o via-custom-unsigned.apk
+        run: apktool b via-decompiled -o via-custom-unsigned.apk
 
-      - name: Generate keystore and sign APK
+      - name: Sign APK
         run: |
-          keytool -genkey -v -keystore my-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 \
+          keytool -genkey -v -keystore release-key.jks -keyalg RSA -keysize 2048 -validity 10000 \
             -alias mykey -storepass password123 -keypass password123 \
             -dname "CN=Custom, OU=Custom, O=Custom, L=Custom, S=Custom, C=BR"
           $JAVA_HOME/bin/jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
-            -keystore my-release-key.jks -storepass password123 -keypass password123 \
+            -keystore release-key.jks -storepass password123 -keypass password123 \
             via-custom-unsigned.apk mykey
           mv via-custom-unsigned.apk via-gemini-browser.apk
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v3
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: via-gemini-browser
           path: via-gemini-browser.apk
